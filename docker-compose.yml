@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # Ollama Service
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_NUM_THREAD=4
+    # Uncomment for GPU support (NVIDIA)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # Flask Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - OLLAMA_API_URL=http://ollama:11434
+      - OLLAMA_MODEL=mistral
+      - FLASK_ENV=production
+    depends_on:
+      - ollama
+    volumes:
+      - ./backend/tutor_ai.db:/app/tutor_ai.db
+    command: gunicorn -w 4 -b 0.0.0.0:5000 app:app
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_URL=http://backend:5000/api
+
+volumes:
+  ollama-data:
+
+networks:
+  default:
+    name: tutor-ai-network
